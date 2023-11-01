@@ -1,5 +1,6 @@
 package com.learnwiremock.service;
 
+import com.learnwiremock.constants.MoviesAppConstants;
 import com.learnwiremock.dto.Movie;
 import com.learnwiremock.exception.MovieErrorResponse;
 import java.time.LocalDate;
@@ -8,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
-import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import lombok.extern.slf4j.Slf4j;
@@ -74,10 +75,23 @@ public class MoviesRestClientTest {
     // given
     // just note that this way of testing is predicated on invalidIdsStartNumber being knowable
     // there would be the potential in some cases of clash between this test case and others depending on how data is persisted
-    LongStream.range(0, 25).forEach(i -> {
-      Long invalidId = random.nextLong(invalidIdsStartNumber, invalidIdsStartNumber + 100000L);
-      assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(invalidId));
-    });
+
+    // null value
+    assertThrows(NullPointerException.class, () -> moviesRestClient.getMovieById(null));
+
+    // boundary value
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(0L));
+
+    // positive values
+    LongStream
+        .generate(() -> random.nextLong(invalidIdsStartNumber, Long.MAX_VALUE))
+        .limit(25)
+        .forEach(invalidId -> assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(invalidId)));
+    // negative values
+    LongStream
+        .generate(() -> random.nextLong(Long.MIN_VALUE, 0))
+        .limit(25)
+        .forEach(invalidId -> assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(invalidId)));
   }
 
   @Test
@@ -87,16 +101,16 @@ public class MoviesRestClientTest {
         .filter(it -> it.getKey().contains(avengers))
         .map(Entry::getValue)
         .toList();
-    List<Movie> avengersMovies = moviesRestClient.getMovieByName(avengers);
+    List<Movie> avengersMovies = moviesRestClient.getMoviesByName(avengers);
     assertEquals(expectedAvengersMovies.size(), avengersMovies.size());
     // could have turned them into sets and compared using set logic but this is fine
-    expectedAvengersMovies.forEach(movie -> assertTrue(avengersMovies.contains(movie)));
-    avengersMovies.forEach(movie -> assertTrue(expectedAvengersMovies.contains(movie)));
+    assertTrue(expectedAvengersMovies.containsAll(avengersMovies));
+    assertTrue(avengersMovies.containsAll(expectedAvengersMovies));
 
     // given
     expectedMovies.forEach((name, movie) -> {
       // when
-      List<Movie> retrievedMovies = moviesRestClient.getMovieByName(name);
+      List<Movie> retrievedMovies = moviesRestClient.getMoviesByName(name);
       // then
       assertFalse(retrievedMovies.isEmpty());
       assertTrue(retrievedMovies.stream().allMatch((it) -> movie.equals(it) || it.getName().contains(name)));
@@ -104,25 +118,30 @@ public class MoviesRestClientTest {
   }
 
   @Test
-  void getMovieByNameNotFound() {
+  void getMoviesByNameNotFound() {
     LongStream.range(0, 25).forEach(i -> {
       final String invalidName = getRandomName();
       assertNotNull(invalidName);
-      assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieByName(invalidName));
+      assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(invalidName));
     });
   }
 
   @Test
-  void getMovieByNameInvalidNameArgument() {
+  void getMoviesByNameInvalidNameArgument() {
     // Note that this is different than the class impl
     // Overall, null, empty string, and blank string name arguments seemed like improper usage of this method
-    assertThrows(NullPointerException.class, () -> moviesRestClient.getMovieByName(null));
-    assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMovieByName(""));
-    assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMovieByName("   "));
+    assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName(""));
+    assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName("   "));
+    assertThrows(NullPointerException.class, () -> moviesRestClient.getMoviesByName(null));
+  }
+
+  @Test
+  @SuppressWarnings("null")
+  void getMoviesByNameNullNameArgument() {
   }
 
   private String getRandomName() {
-    String invalidName = null;
+    String invalidName;
     int attemptLimit = 0; // sanity prevent infinite loop
     do {
       invalidName = getRandomString(random.nextInt(24, 64));
@@ -134,9 +153,36 @@ public class MoviesRestClientTest {
 
   private String getRandomString(int length) {
     StringBuilder sb = new StringBuilder();
-    IntStream.range(0, length).forEach(it -> {
-      sb.append(asciiCharacterSet.charAt(random.nextInt(0, asciiCharacterSet.length())));
-    });
+    IntStream
+        .generate(() -> random.nextInt(0, asciiCharacterSet.length()))
+        .limit(length)
+        .forEach(index -> sb.append(asciiCharacterSet.charAt(index)));
     return sb.toString();
+  }
+
+  @Test
+  void getMoviesByYear() {
+    Map<Integer, List<Movie>> moviesGroupedByYear = expectedMovies.values().stream().collect(Collectors.groupingBy(Movie::getYear));
+    moviesGroupedByYear.forEach((year, expectedMovies) -> {
+      List<Movie> retrievedMovies = moviesRestClient.getMoviesByYear(year);
+      assertEquals(expectedMovies.size(), retrievedMovies.size());
+      assertTrue(retrievedMovies.containsAll(expectedMovies));
+      assertTrue(expectedMovies.containsAll(retrievedMovies));
+    });
+  }
+
+  @Test
+  void getMoviesByYearNotFound() {
+    IntStream
+        .generate(this::getRandomInvalidYear)
+        .limit(25)
+        .forEach(invalidYear -> assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(invalidYear)));
+  }
+
+  Integer getRandomInvalidYear() {
+    if (random.nextInt(0, 2) % 2 == 0) {
+      return random.nextInt(Integer.MIN_VALUE, MoviesAppConstants.YEAR_OF_FIRST_MOVIE_EVER_MADE);
+    }
+    return random.nextInt(2100, Integer.MAX_VALUE);
   }
 }
