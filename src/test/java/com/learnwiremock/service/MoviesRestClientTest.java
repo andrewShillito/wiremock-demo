@@ -1,6 +1,7 @@
 package com.learnwiremock.service;
 
 import com.learnwiremock.constants.MoviesAppConstants;
+import com.learnwiremock.constants.MoviesTestConstants;
 import com.learnwiremock.dto.Movie;
 import com.learnwiremock.exception.MovieErrorResponse;
 import java.time.LocalDate;
@@ -26,10 +27,8 @@ public class MoviesRestClientTest {
   WebClient webClient;
 
   private static final Random random = new Random();
-
   private static final Long invalidIdsStartNumber = 100000L;
-
-  private static final String asciiCharacterSet = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+  private static final String baseUrl = "http://localhost:8081";
   private static final Map<String, Movie> expectedMovies = Map.of(
       "Batman Begins", new Movie("Christian Bale, Katie Holmes , Liam Neeson", 1L, "Batman Begins", LocalDate.of(2005, Month.JUNE, 15), 2005),
       "Dark Knight", new Movie("Christian Bale, Heath Ledger , Michael Caine", 2L, "Dark Knight", LocalDate.of(2008, Month.JULY, 18), 2008),
@@ -45,7 +44,6 @@ public class MoviesRestClientTest {
 
   @BeforeEach
   void setUp() {
-    final String baseUrl = "http://localhost:8081";
     webClient = WebClient.create(baseUrl);
     moviesRestClient = new MoviesRestClient(webClient);
   }
@@ -154,9 +152,9 @@ public class MoviesRestClientTest {
   private String getRandomString(int length) {
     StringBuilder sb = new StringBuilder();
     IntStream
-        .generate(() -> random.nextInt(0, asciiCharacterSet.length()))
+        .generate(() -> random.nextInt(0, MoviesTestConstants.ASCII_CHARACTER_SET.length()))
         .limit(length)
-        .forEach(index -> sb.append(asciiCharacterSet.charAt(index)));
+        .forEach(index -> sb.append(MoviesTestConstants.ASCII_CHARACTER_SET.charAt(index)));
     return sb.toString();
   }
 
