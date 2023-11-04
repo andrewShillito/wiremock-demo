@@ -1,5 +1,12 @@
 package com.learnwiremock.service;
 
+import com.github.jenspiegsa.wiremockextension.ConfigureWireMock;
+import com.github.jenspiegsa.wiremockextension.InjectServer;
+import com.github.jenspiegsa.wiremockextension.WireMockExtension;
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.common.ConsoleNotifier;
+import com.github.tomakehurst.wiremock.core.Options;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.learnwiremock.dto.Movie;
 import com.learnwiremock.exception.MovieErrorResponse;
 import com.learnwiremock.utils.RandomUtils;
@@ -18,15 +25,27 @@ import java.util.stream.LongStream;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @Slf4j
+@ExtendWith(WireMockExtension.class)
 public class MoviesRestClientTest {
 
   MoviesRestClient moviesRestClient;
   WebClient webClient;
+
+  @InjectServer
+  WireMockServer wireMockServer;
+
+  @ConfigureWireMock
+  Options options = WireMockConfiguration
+      .wireMockConfig()
+      .port(8088)
+      .notifier(new ConsoleNotifier(true));
+
   private static final Random random = new Random();
 
   private static final Long invalidIdsStartNumber = 100_000L;

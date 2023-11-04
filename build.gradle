@@ -8,6 +8,7 @@ version '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
+    maven {url "https://jitpack.io"}
 }
 
 dependencies {
@@ -32,6 +33,10 @@ dependencies {
     testAnnotationProcessor('org.projectlombok:lombok:1.18.30')
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+
+    // wiremock
+    testImplementation "com.github.tomakehurst:wiremock-jre8-standalone:2.24.1"
+    implementation "com.github.JensPiegsa:wiremock-extension:0.4.0"
 }
 
 apply plugin: "jacoco"
