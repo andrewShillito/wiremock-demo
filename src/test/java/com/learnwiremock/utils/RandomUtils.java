@@ -26,6 +26,12 @@ public class RandomUtils {
     return sb.toString();
   }
 
+  /**
+   * It is very unlikely even without an existing movies map that we would generate two identical names.
+   * However, tests being re-runnable is definitely nice to have and assert.
+   * @param existingMovies
+   * @return
+   */
   public static String getRandomUniqueMovieName(Map<String, Movie> existingMovies) {
     String name;
     int attemptLimit = 0; // sanity prevent infinite loop

@@ -245,8 +245,19 @@ public class MoviesRestClientTest {
     assertEquals(createdMovie.getYear(), updated.getYear());
 
     // change everything at once
-    createdMovie.setYear(RandomUtils.getRandomYear(seededYears));
+    LocalDate newReleaseDate = RandomUtils.getRandomLocalDate(seededYears);
+    String appendToCast = RandomUtils.getRandomString(10);
+    String newName = RandomUtils.getRandomName();
+    String previousCast = updated.getCast();
+    createdMovie.setName(newName);
+    createdMovie.setCast(appendToCast);
+    createdMovie.setReleaseDate(newReleaseDate);
+    createdMovie.setYear(newReleaseDate.getYear());
     updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
+    assertEquals(createdMovie.getMovie_id(), updated.getMovie_id());
+    assertEquals(createdMovie.getName(), updated.getName());
+    assertEquals(previousCast + ", " + createdMovie.getCast(), updated.getCast());
+    assertEquals(createdMovie.getReleaseDate(), updated.getReleaseDate());
     assertEquals(createdMovie.getYear(), updated.getYear());
   }
 
