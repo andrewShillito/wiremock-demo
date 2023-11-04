@@ -136,11 +136,6 @@ public class MoviesRestClientTest {
     assertThrows(NullPointerException.class, () -> moviesRestClient.getMoviesByName(null));
   }
 
-  @Test
-  @SuppressWarnings("null")
-  void getMoviesByNameNullNameArgument() {
-  }
-
   private String getRandomName() {
     String invalidName;
     int attemptLimit = 0; // sanity prevent infinite loop
@@ -197,15 +192,8 @@ public class MoviesRestClientTest {
       assertNull(generatedMovie.getMovie_id());
       generatedMovie.setMovie_id(random.nextLong(invalidIdsStartNumber, Long.MAX_VALUE));
       Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
-      assertEquals(generatedMovie.getName(), createdMovie.getName());
-      assertEquals(generatedMovie.getCast(), createdMovie.getCast());
-      assertEquals(generatedMovie.getReleaseDate(), createdMovie.getReleaseDate());
-      assertEquals(generatedMovie.getYear(), createdMovie.getYear());
-      assertNotEquals(generatedMovie.getMovie_id(), createdMovie.getMovie_id());
-      if (previousId.get() != null) {
-        assertEquals(previousId.get() + 1, createdMovie.getMovie_id());
-      }
-      previousId.set(createdMovie.getMovie_id());
+      Long expectedId = previousId.accumulateAndGet(1L, (a, b) -> a == null || b == null ? createdMovie.getMovie_id() : a + b);
+      assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, expectedId);
     });
 
     // without id
@@ -213,16 +201,19 @@ public class MoviesRestClientTest {
       Movie generatedMovie = generateRandomMovie();
       assertNull(generatedMovie.getMovie_id());
       Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
-      assertEquals(generatedMovie.getName(), createdMovie.getName());
-      assertEquals(generatedMovie.getCast(), createdMovie.getCast());
-      assertEquals(generatedMovie.getReleaseDate(), createdMovie.getReleaseDate());
-      assertEquals(generatedMovie.getYear(), createdMovie.getYear());
-      assertNotEquals(generatedMovie.getMovie_id(), createdMovie.getMovie_id());
-      if (previousId.get() != null) {
-        assertEquals(previousId.get() + 1, createdMovie.getMovie_id());
-      }
-      previousId.set(createdMovie.getMovie_id());
+      assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, previousId.accumulateAndGet(1L, Long::sum));
     });
+  }
+
+  void assertCreatedMovieIsAsExpected(Movie expected, Movie actual, Long expectedId) {
+    assertEquals(expected.getName(), actual.getName());
+    assertEquals(expected.getCast(), actual.getCast());
+    assertEquals(expected.getReleaseDate(), actual.getReleaseDate());
+    assertEquals(expected.getYear(), actual.getYear());
+    assertNotEquals(expected.getMovie_id(), actual.getMovie_id());
+    if (expectedId != null) {
+      assertEquals(expectedId, actual.getMovie_id());
+    }
   }
 
   @Test
@@ -239,6 +230,51 @@ public class MoviesRestClientTest {
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.createMovie(movie), "Bad Request");
   }
 
+  @Test
+  void updateMovie() {
+    Movie generatedMovie = generateRandomMovie();
+    Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
+    assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, null);
+
+    // clear cast?
+    String cast = createdMovie.getCast();
+    createdMovie.setCast(null);
+    Movie updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
+    assertEquals(cast, updated.getCast()); // nothing happens if you try to set to null
+
+    // append to cast
+    createdMovie.setCast(getRandomString(10));
+    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
+    assertEquals(cast + ", " + createdMovie.getCast(), updated.getCast());
+
+    // change name
+    createdMovie.setName(getRandomName());
+    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
+    assertEquals(createdMovie.getName(), updated.getName());
+
+    // try and fail to increment id
+    Long existingId = createdMovie.getMovie_id();
+    Long newId = createdMovie.getMovie_id() + 1;
+    createdMovie.setMovie_id(newId);
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie), "Not Found");
+    createdMovie.setMovie_id(existingId); // reset to correct value
+
+    // change LocalDate
+    createdMovie.setReleaseDate(getRandomLocalDate());
+    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
+    assertEquals(createdMovie.getReleaseDate(), updated.getReleaseDate());
+
+    // change year
+    createdMovie.setYear(getRandomYear());
+    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
+    assertEquals(createdMovie.getYear(), updated.getYear());
+
+    // change everything at once
+    createdMovie.setYear(getRandomYear());
+    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
+    assertEquals(createdMovie.getYear(), updated.getYear());
+  }
+
   /**
    * Returns a new Movie object with null id
    * @return a randomly generated movie
@@ -252,6 +288,12 @@ public class MoviesRestClientTest {
         LocalDate.of(year, month, getRandomDayInMonth(year, month)),
         year
     );
+  }
+
+  private LocalDate getRandomLocalDate() {
+    int year = getRandomYear();
+    Month month = Month.of(getRandomMonth());
+    return LocalDate.of(year, month, getRandomDayInMonth(year, month));
   }
 
   private int getRandomYear() {

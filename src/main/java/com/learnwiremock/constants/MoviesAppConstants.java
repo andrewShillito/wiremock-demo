@@ -15,6 +15,7 @@ public class MoviesAppConstants {
   public static final String V1_GET_MOVIE_BY_NAME = "movieservice/v1/movieName";
   public static final String V1_GET_MOVIE_BY_YEAR = "movieservice/v1/movieYear";
   public static final String V1_POST_MOVIE = "movieservice/v1/movie";
+  public static final String V1_PUT_MOVIE_BY_ID = "movieservice/v1/movie/{id}";
 
   /*
   * QUERY PARAMETERS

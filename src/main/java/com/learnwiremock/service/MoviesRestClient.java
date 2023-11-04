@@ -119,4 +119,25 @@ public class MoviesRestClient {
       throw new MovieErrorResponse(e);
     }
   }
+
+  public Movie updateMovie(Long id, Movie movie) {
+    try {
+      return webClient.put()
+          .uri(MoviesAppConstants.V1_PUT_MOVIE_BY_ID, id)
+          .syncBody(movie)
+          .retrieve()
+          .bodyToMono(Movie.class)
+          .block();
+    } catch (WebClientResponseException e) {
+      log.error(String.format(e.getClass().getName()
+              + ": Movie %s could not be updated with status %s. Response message is: %s", movie,
+          e.getStatusCode(), e.getResponseBodyAsString()));
+      throw new MovieErrorResponse(e.getStatusText(), e);
+    } catch (Exception e) {
+      log.error(String.format(
+          e.getClass().getName() + ": Movie %s could not be updated. Response message is: %s", movie,
+          e.getMessage()));
+      throw new MovieErrorResponse(e);
+    }
+  }
 }
