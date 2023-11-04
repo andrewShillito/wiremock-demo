@@ -276,6 +276,13 @@ public class MoviesRestClientTest {
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(createdMovie2.getMovie_id()));
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(createdMovie2.getMovie_id()));
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(createdMovie2.getName()));
+
+    // invalid arguments
+    assertThrows(NullPointerException.class, () -> moviesRestClient.deleteMovie(null));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(0L));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(-1L));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(Long.MIN_VALUE));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(Long.MAX_VALUE));
   }
 
 }

@@ -141,7 +141,7 @@ public class MoviesRestClient {
     }
   }
 
-  public String deleteMovie(Long id) {
+  public String deleteMovie(@NonNull Long id) {
     try {
       return webClient.delete()
           .uri(MoviesAppConstants.V1_DELETE_MOVIE_BY_ID, id)
