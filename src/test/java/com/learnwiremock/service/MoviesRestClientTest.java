@@ -250,4 +250,32 @@ public class MoviesRestClientTest {
     assertEquals(createdMovie.getYear(), updated.getYear());
   }
 
+  @Test
+  void deleteMovie() {
+    final String expectedResponseBody = "Movie Deleted Successfully";
+
+    Movie generatedMovie = RandomUtils.generateRandomMovie();
+    Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
+    assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, null);
+
+    Movie generatedMovie2 = RandomUtils.generateRandomMovie();
+    Movie createdMovie2 = moviesRestClient.createMovie(generatedMovie2);
+    assertCreatedMovieIsAsExpected(generatedMovie2, createdMovie2, null);
+
+    // delete existing movie
+    String deleteResponse = moviesRestClient.deleteMovie(createdMovie.getMovie_id());
+    assertEquals(expectedResponseBody, deleteResponse);
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(createdMovie.getMovie_id()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(createdMovie.getMovie_id()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(createdMovie.getName()));
+    assertEquals(createdMovie2, moviesRestClient.getMovieById(createdMovie2.getMovie_id()));
+
+    // delete second existing movie
+    deleteResponse = moviesRestClient.deleteMovie(createdMovie2.getMovie_id());
+    assertEquals(expectedResponseBody, deleteResponse);
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(createdMovie2.getMovie_id()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(createdMovie2.getMovie_id()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(createdMovie2.getName()));
+  }
+
 }
