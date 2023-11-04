@@ -26,4 +26,10 @@ public class Movie {
   private LocalDate releaseDate;
   private Integer year;
 
+  public Movie(String cast, String name, LocalDate releaseDate, Integer year) {
+    this.cast = cast;
+    this.name = name;
+    this.releaseDate = releaseDate;
+    this.year = year;
+  }
 }

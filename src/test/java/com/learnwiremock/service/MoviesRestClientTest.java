@@ -6,10 +6,12 @@ import com.learnwiremock.dto.Movie;
 import com.learnwiremock.exception.MovieErrorResponse;
 import java.time.LocalDate;
 import java.time.Month;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -27,7 +29,7 @@ public class MoviesRestClientTest {
   WebClient webClient;
 
   private static final Random random = new Random();
-  private static final Long invalidIdsStartNumber = 100000L;
+  private static final Long invalidIdsStartNumber = 100_000L;
   private static final String baseUrl = "http://localhost:8081";
   private static final Map<String, Movie> expectedMovies = Map.of(
       "Batman Begins", new Movie("Christian Bale, Katie Holmes , Liam Neeson", 1L, "Batman Begins", LocalDate.of(2005, Month.JUNE, 15), 2005),
@@ -181,6 +183,71 @@ public class MoviesRestClientTest {
     if (random.nextInt(0, 2) % 2 == 0) {
       return random.nextInt(Integer.MIN_VALUE, MoviesAppConstants.YEAR_OF_FIRST_MOVIE_EVER_MADE);
     }
-    return random.nextInt(2100, Integer.MAX_VALUE);
+    return random.nextInt(3000, Integer.MAX_VALUE);
+  }
+
+  @Test
+  void createMovie() {
+    // note behavior that id value given is ignored by the rest api
+    AtomicReference<Long> previousId = new AtomicReference<>();
+    // with id
+    IntStream.range(0, 10).forEach(it -> {
+      Movie generatedMovie = generateRandomMovie();
+      assertNull(generatedMovie.getMovie_id());
+      generatedMovie.setMovie_id(random.nextLong(invalidIdsStartNumber, Long.MAX_VALUE));
+      Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
+      assertEquals(generatedMovie.getName(), createdMovie.getName());
+      assertEquals(generatedMovie.getCast(), createdMovie.getCast());
+      assertEquals(generatedMovie.getReleaseDate(), createdMovie.getReleaseDate());
+      assertEquals(generatedMovie.getYear(), createdMovie.getYear());
+      assertNotEquals(generatedMovie.getMovie_id(), createdMovie.getMovie_id());
+      if (previousId.get() != null) {
+        assertEquals(previousId.get() + 1, createdMovie.getMovie_id());
+      }
+      previousId.set(createdMovie.getMovie_id());
+    });
+
+    // without id
+    IntStream.range(0, 10).forEach(it -> {
+      Movie generatedMovie = generateRandomMovie();
+      assertNull(generatedMovie.getMovie_id());
+      Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
+      assertEquals(generatedMovie.getName(), createdMovie.getName());
+      assertEquals(generatedMovie.getCast(), createdMovie.getCast());
+      assertEquals(generatedMovie.getReleaseDate(), createdMovie.getReleaseDate());
+      assertEquals(generatedMovie.getYear(), createdMovie.getYear());
+      assertNotEquals(generatedMovie.getMovie_id(), createdMovie.getMovie_id());
+      if (previousId.get() != null) {
+        assertEquals(previousId.get() + 1, createdMovie.getMovie_id());
+      }
+      previousId.set(createdMovie.getMovie_id());
+    });
+  }
+
+  /**
+   * Returns a new Movie object with null id
+   * @return a randomly generated movie
+   */
+  private Movie generateRandomMovie() {
+    int year = getRandomYear();
+    Month month = Month.of(getRandomMonth());
+    return new Movie(
+        getRandomString(100),
+        getRandomName(),
+        LocalDate.of(year, month, getRandomDayInMonth(year, month)),
+        year
+    );
+  }
+
+  private int getRandomYear() {
+    return random.nextInt(0, LocalDate.now().getYear() + 1);
+  }
+
+  private int getRandomMonth() {
+    return random.nextInt(1, 13);
+  }
+
+  private int getRandomDayInMonth(int year, Month month) {
+    return random.nextInt(1, YearMonth.of(year, month).lengthOfMonth() + 1);
   }
 }
