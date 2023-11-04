@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -222,6 +223,20 @@ public class MoviesRestClientTest {
       }
       previousId.set(createdMovie.getMovie_id());
     });
+  }
+
+  @Test
+  void createMovieBadRequest() {
+    badCreateRequest(m -> m.setCast(null));
+    badCreateRequest(m -> m.setName(null));
+    badCreateRequest(m -> m.setYear(null));
+    badCreateRequest(m -> m.setReleaseDate(null));
+  }
+
+  void badCreateRequest(Consumer<Movie> mutator) {
+    Movie movie = generateRandomMovie();
+    mutator.accept(movie);
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.createMovie(movie), "Bad Request");
   }
 
   /**
