@@ -1,12 +1,10 @@
 package com.learnwiremock.service;
 
-import com.learnwiremock.constants.MoviesAppConstants;
-import com.learnwiremock.constants.MoviesTestConstants;
 import com.learnwiremock.dto.Movie;
 import com.learnwiremock.exception.MovieErrorResponse;
+import com.learnwiremock.utils.RandomUtils;
 import java.time.LocalDate;
 import java.time.Month;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -29,8 +27,8 @@ public class MoviesRestClientTest {
 
   MoviesRestClient moviesRestClient;
   WebClient webClient;
-
   private static final Random random = new Random();
+
   private static final Long invalidIdsStartNumber = 100_000L;
   private static final String baseUrl = "http://localhost:8081";
   private static final Map<String, Movie> expectedMovies = Map.of(
@@ -125,7 +123,7 @@ public class MoviesRestClientTest {
   @Test
   void getMoviesByNameNotFound() {
     LongStream.range(0, 25).forEach(i -> {
-      final String invalidName = getRandomName();
+      final String invalidName = RandomUtils.getRandomUniqueMovieName(expectedMovies);
       assertNotNull(invalidName);
       assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(invalidName));
     });
@@ -138,26 +136,6 @@ public class MoviesRestClientTest {
     assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName(""));
     assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName("   "));
     assertThrows(NullPointerException.class, () -> moviesRestClient.getMoviesByName(null));
-  }
-
-  private String getRandomName() {
-    String invalidName;
-    int attemptLimit = 0; // sanity prevent infinite loop
-    do {
-      invalidName = getRandomString(random.nextInt(24, 64));
-      attemptLimit++;
-    } while (expectedMovies.containsKey(invalidName) && attemptLimit < 10);
-    assertTrue(attemptLimit < 10, "Attempted to randomly generate a movie name beyond the mandated attemptLimit of 10 attempts.");
-    return invalidName;
-  }
-
-  private String getRandomString(int length) {
-    StringBuilder sb = new StringBuilder();
-    IntStream
-        .generate(() -> random.nextInt(0, MoviesTestConstants.ASCII_CHARACTER_SET.length()))
-        .limit(length)
-        .forEach(index -> sb.append(MoviesTestConstants.ASCII_CHARACTER_SET.charAt(index)));
-    return sb.toString();
   }
 
   @Test
@@ -174,16 +152,9 @@ public class MoviesRestClientTest {
   @Test
   void getMoviesByYearNotFound() {
     IntStream
-        .generate(this::getRandomInvalidYear)
+        .generate(RandomUtils::getRandomInvalidYear)
         .limit(25)
         .forEach(invalidYear -> assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(invalidYear)));
-  }
-
-  Integer getRandomInvalidYear() {
-    if (random.nextInt(0, 2) % 2 == 0) {
-      return random.nextInt(Integer.MIN_VALUE, MoviesAppConstants.YEAR_OF_FIRST_MOVIE_EVER_MADE);
-    }
-    return random.nextInt(3000, Integer.MAX_VALUE);
   }
 
   @Test
@@ -192,7 +163,7 @@ public class MoviesRestClientTest {
     AtomicReference<Long> previousId = new AtomicReference<>();
     // with id
     IntStream.range(0, 10).forEach(it -> {
-      Movie generatedMovie = generateRandomMovie();
+      Movie generatedMovie = RandomUtils.generateRandomMovie();
       assertNull(generatedMovie.getMovie_id());
       generatedMovie.setMovie_id(random.nextLong(invalidIdsStartNumber, Long.MAX_VALUE));
       Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
@@ -202,7 +173,7 @@ public class MoviesRestClientTest {
 
     // without id
     IntStream.range(0, 10).forEach(it -> {
-      Movie generatedMovie = generateRandomMovie();
+      Movie generatedMovie = RandomUtils.generateRandomMovie();
       assertNull(generatedMovie.getMovie_id());
       Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
       assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, previousId.accumulateAndGet(1L, Long::sum));
@@ -229,14 +200,14 @@ public class MoviesRestClientTest {
   }
 
   void badCreateRequest(Consumer<Movie> mutator) {
-    Movie movie = generateRandomMovie();
+    Movie movie = RandomUtils.generateRandomMovie();
     mutator.accept(movie);
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.createMovie(movie), "Bad Request");
   }
 
   @Test
   void updateMovie() {
-    Movie generatedMovie = generateRandomMovie();
+    Movie generatedMovie = RandomUtils.generateRandomMovie();
     Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
     assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, null);
 
@@ -247,12 +218,12 @@ public class MoviesRestClientTest {
     assertEquals(cast, updated.getCast()); // nothing happens if you try to set to null
 
     // append to cast
-    createdMovie.setCast(getRandomString(10));
+    createdMovie.setCast(RandomUtils.getRandomString(10));
     updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
     assertEquals(cast + ", " + createdMovie.getCast(), updated.getCast());
 
     // change name
-    createdMovie.setName(getRandomName());
+    createdMovie.setName(RandomUtils.getRandomUniqueMovieName(expectedMovies));
     updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
     assertEquals(createdMovie.getName(), updated.getName());
 
@@ -264,55 +235,19 @@ public class MoviesRestClientTest {
     createdMovie.setMovie_id(existingId); // reset to correct value
 
     // change LocalDate
-    createdMovie.setReleaseDate(getRandomLocalDate());
+    createdMovie.setReleaseDate(RandomUtils.getRandomLocalDate(seededYears));
     updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
     assertEquals(createdMovie.getReleaseDate(), updated.getReleaseDate());
 
     // change year
-    createdMovie.setYear(getRandomYear());
+    createdMovie.setYear(RandomUtils.getRandomYear(seededYears));
     updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
     assertEquals(createdMovie.getYear(), updated.getYear());
 
     // change everything at once
-    createdMovie.setYear(getRandomYear());
+    createdMovie.setYear(RandomUtils.getRandomYear(seededYears));
     updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
     assertEquals(createdMovie.getYear(), updated.getYear());
   }
 
-  /**
-   * Returns a new Movie object with null id
-   * @return a randomly generated movie
-   */
-  private Movie generateRandomMovie() {
-    LocalDate localDate = getRandomLocalDate();
-    return new Movie(
-        getRandomString(100),
-        getRandomName(),
-        localDate,
-        localDate.getYear()
-    );
-  }
-
-  private LocalDate getRandomLocalDate() {
-    int year = getRandomYear();
-    Month month = Month.of(getRandomMonth());
-    return LocalDate.of(year, month, getRandomDayInMonth(year, month));
-  }
-
-  private int getRandomYear() {
-    // random past or future year
-    int year = random.nextInt(0, LocalDate.now().getYear() + 1);
-    while (seededYears.contains(year)) {
-      year = random.nextInt(0, LocalDate.now().getYear() + 1);
-    }
-    return year;
-  }
-
-  private int getRandomMonth() {
-    return random.nextInt(1, 13);
-  }
-
-  private int getRandomDayInMonth(int year, Month month) {
-    return random.nextInt(1, YearMonth.of(year, month).lengthOfMonth() + 1);
-  }
 }

@@ -140,4 +140,24 @@ public class MoviesRestClient {
       throw new MovieErrorResponse(e);
     }
   }
+
+  public String deleteMovie(Long id) {
+    try {
+      return webClient.delete()
+          .uri(MoviesAppConstants.V1_DELETE_MOVIE_BY_ID, id)
+          .retrieve()
+          .bodyToMono(String.class)
+          .block();
+    } catch (WebClientResponseException e) {
+      log.error(String.format(e.getClass().getName()
+              + ": Movie with id %d could not be deleted with status %s. Response message is: %s", id,
+          e.getStatusCode(), e.getResponseBodyAsString()));
+      throw new MovieErrorResponse(e.getStatusText(), e);
+    } catch (Exception e) {
+      log.error(String.format(
+          e.getClass().getName() + ": Movie with id %d could not be deleted. Response message is: %s", id,
+          e.getMessage()));
+      throw new MovieErrorResponse(e);
+    }
+  }
 }
