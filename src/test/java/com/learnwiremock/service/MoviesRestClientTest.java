@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -44,6 +45,9 @@ public class MoviesRestClientTest {
       "The Imitation Game", new Movie("Benedict Cumberbatch, Keira Knightley", 9L, "The Imitation Game", LocalDate.of(2014, Month.DECEMBER, 25), 2014),
       "The Departed", new Movie("Leonardo DiCaprio, Matt Damon , Mark Wahlberg", 10L, "The Departed", LocalDate.of(2006, Month.OCTOBER, 6), 2006)
   );
+
+  /** Prevent clash of randomly selected years with seeded test movies ( so get movie by year is re-runnable ) */
+  private static Set<Integer> seededYears = Set.of(2005, 2008, 2012, 2015, 2018, 2019, 2009, 2014, 2006);
 
   @BeforeEach
   void setUp() {
@@ -280,13 +284,12 @@ public class MoviesRestClientTest {
    * @return a randomly generated movie
    */
   private Movie generateRandomMovie() {
-    int year = getRandomYear();
-    Month month = Month.of(getRandomMonth());
+    LocalDate localDate = getRandomLocalDate();
     return new Movie(
         getRandomString(100),
         getRandomName(),
-        LocalDate.of(year, month, getRandomDayInMonth(year, month)),
-        year
+        localDate,
+        localDate.getYear()
     );
   }
 
@@ -297,7 +300,12 @@ public class MoviesRestClientTest {
   }
 
   private int getRandomYear() {
-    return random.nextInt(0, LocalDate.now().getYear() + 1);
+    // random past or future year
+    int year = random.nextInt(0, LocalDate.now().getYear() + 1);
+    while (seededYears.contains(year)) {
+      year = random.nextInt(0, LocalDate.now().getYear() + 1);
+    }
+    return year;
   }
 
   private int getRandomMonth() {
