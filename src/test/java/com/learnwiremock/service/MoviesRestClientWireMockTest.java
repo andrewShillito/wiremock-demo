@@ -16,7 +16,6 @@ import java.time.LocalDate;
 import java.time.Month;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -167,13 +166,13 @@ public class MoviesRestClientWireMockTest {
         )
     );
 
-    final String nameQueryParam = "Avengers";
-    List<Movie> retrievedMovies = moviesRestClient.getMoviesByName(nameQueryParam);
+    final String nameQuery = "Avengers";
+    List<Movie> retrievedMovies = moviesRestClient.getMoviesByName(nameQuery);
     assertFalse(retrievedMovies.isEmpty());
     // could have turned them into sets and compared using set logic but this is fine
     retrievedMovies.forEach(it -> {
       assertIsValidMovie(it);
-      assertTrue(it.getName().contains(nameQueryParam));
+      assertTrue(it.getName().contains(nameQuery));
     });
   }
 
@@ -188,19 +187,28 @@ public class MoviesRestClientWireMockTest {
 
   @Test
   void getMoviesByNameNotFound() {
-    LongStream.range(0, 25).forEach(i -> {
-      final String invalidName = MoviesTestRandomUtils.getRandomUniqueMovieName(expectedMovies);
-      assertNotNull(invalidName);
-      assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(invalidName));
-    });
+    final String stubUrl = String.format(
+        "/%s?%s=notFound",
+        MoviesAppConstants.V1_GET_MOVIE_BY_NAME,
+        MoviesAppConstants.V1_GET_MOVIE_BY_NAME_QUERY_PARAM_MOVIE_NAME
+    );
+    stubFor(get(urlEqualTo(stubUrl))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.NOT_FOUND.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .withBodyFile("get-movie-by-name-template-not-found.json")
+        )
+    );
+    final String nameQuery = "notFound";
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(nameQuery), "No Movie Available with the given name - " + nameQuery);
   }
 
   @Test
   void getMoviesByNameInvalidNameArgument() {
     // Note that this is different than the class impl
     // Overall, null, empty string, and blank string name arguments seemed like improper usage of this method
-    assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName(""));
-    assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName("   "));
+    assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName(""), "Name argument in get movies by name must not be blank");
+    assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName("   "), "Name argument in get movies by name must not be blank");
     assertThrows(NullPointerException.class, () -> moviesRestClient.getMoviesByName(null));
   }
 

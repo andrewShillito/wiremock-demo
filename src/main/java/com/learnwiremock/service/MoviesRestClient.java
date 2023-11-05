@@ -50,7 +50,7 @@ public class MoviesRestClient {
 
   public List<Movie> getMoviesByName(@NonNull String name) {
     if (name.isBlank()) {
-      throw new IllegalArgumentException("Name argument in search by name must not be blank");
+      throw new IllegalArgumentException("Name argument in get movies by name must not be blank");
     }
     try {
       return webClient.get()
