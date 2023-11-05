@@ -12,11 +12,18 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.IntStream;
+import org.apache.commons.lang3.RandomStringUtils;
 
-public class RandomUtils {
+public class MoviesTestRandomUtils {
 
   private static final Random random = new Random();
 
+  /**
+   * Return a random ascii string of the specified length.
+   * @deprecated Recommended to use {@link RandomStringUtils#randomAscii(int)} instead
+   * @param length the length of the string to return
+   * @return a random ascii string
+   */
   public static String getRandomString(int length) {
     StringBuilder sb = new StringBuilder();
     IntStream
@@ -44,17 +51,17 @@ public class RandomUtils {
   }
 
   public static String getRandomName() {
-    return getRandomString(random.nextInt(24, 64));
+    return RandomStringUtils.randomAscii(24, 64);
   }
 
   /**
    * Returns a new Movie object with null id
    * @return a randomly generated movie
    */
-  public static Movie generateRandomMovie() {
+  public static Movie getRandomMovie() {
     LocalDate localDate = getRandomLocalDate();
     return new Movie(
-        getRandomString(100),
+        RandomStringUtils.randomAscii(100),
         getRandomName(),
         localDate,
         localDate.getYear()
