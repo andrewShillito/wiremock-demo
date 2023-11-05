@@ -187,10 +187,12 @@ public class MoviesRestClientWireMockTest {
 
   @Test
   void getMoviesByNameNotFound() {
+    final String randomName = RandomStringUtils.randomAlphabetic(10);
     final String stubUrl = String.format(
-        "/%s?%s=notFound",
+        "/%s?%s=%s",
         MoviesAppConstants.V1_GET_MOVIE_BY_NAME,
-        MoviesAppConstants.V1_GET_MOVIE_BY_NAME_QUERY_PARAM_MOVIE_NAME
+        MoviesAppConstants.V1_GET_MOVIE_BY_NAME_QUERY_PARAM_MOVIE_NAME,
+        randomName
     );
     stubFor(get(urlEqualTo(stubUrl))
         .willReturn(aResponse()
@@ -199,8 +201,7 @@ public class MoviesRestClientWireMockTest {
             .withBodyFile("get-movie-by-name-template-not-found.json")
         )
     );
-    final String nameQuery = "notFound";
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(nameQuery), "No Movie Available with the given name - " + nameQuery);
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(randomName), "No Movie Available with the given name - " + randomName);
   }
 
   @Test
