@@ -1,0 +1,9 @@
+[
+  {
+    "movie_id": "{{request.path.[3]}}",
+    "name": "{{ parameters.name }}",
+    "year": "{{ parameters.year }}",
+    "cast": "{{ parameters.cast }}",
+    "release_date": "{{ parameters.release_date }}"
+  }
+]
