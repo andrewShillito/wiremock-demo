@@ -81,6 +81,11 @@ public class MoviesTestRandomUtils {
     return LocalDate.of(year, month, getRandomDayInMonth(year, month));
   }
 
+  public static LocalDate getRandomLocalDateInYear(Integer year) {
+    Month month = Month.of(getRandomMonth());
+    return LocalDate.of(year, month, getRandomDayInMonth(year, month));
+  }
+
   public static int getRandomYear(Set<Integer> excludedYears) {
     // random past or future year
     int year;

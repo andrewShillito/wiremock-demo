@@ -1,0 +1,37 @@
+[
+  {
+    "movie_id": "1",
+    "name": "{{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }} {{ randomValue length=6 type='ALPHANUMERIC' }}",
+    "year": "{{ request.query.year }}",
+    "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
+    "release_date": "{{ parameters.release_date }}"
+  },
+  {
+    "movie_id": "2",
+    "name": "The {{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }} {{ randomValue length=6 type='ALPHANUMERIC' }}",
+    "year": "{{ request.query.year }}",
+    "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
+    "release_date": "{{ parameters.release_date }}"
+  },
+  {
+    "movie_id": "3",
+    "name": "A {{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }} {{ randomValue length=6 type='ALPHANUMERIC' }}",
+    "year": "{{ request.query.year }}",
+    "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
+    "release_date": "{{ parameters.release_date }}"
+  },
+  {
+    "movie_id": "4",
+    "name": "Story of {{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }}",
+    "year": "{{ request.query.year }}",
+    "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
+    "release_date": "{{ parameters.release_date }}"
+  },
+  {
+    "movie_id": "5",
+    "name": "A tale of {{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }}",
+    "year": "{{ request.query.year }}",
+    "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
+    "release_date": "{{ parameters.release_date }}"
+  }
+]

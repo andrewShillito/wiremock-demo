@@ -20,7 +20,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import lombok.extern.slf4j.Slf4j;
@@ -104,7 +103,7 @@ public class MoviesRestClientWireMockTest {
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .withBodyFile("get-movie-template-parameterized.json")
+            .withBodyFile("get-movie-by-id-template-parameterized.json")
             .withTransformerParameter("name", exampleName)
             .withTransformerParameter("release_date", exampleDate.toString())
             .withTransformerParameter("cast", exampleCast)
@@ -129,7 +128,7 @@ public class MoviesRestClientWireMockTest {
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .withBodyFile("get-movie-template-not-found.json")
+            .withBodyFile("get-movie-by-id-template-not-found.json")
         )
     );
 
@@ -162,11 +161,11 @@ public class MoviesRestClientWireMockTest {
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .withBodyFile("get-movie-by-name-template-randomized.json")
+            .withBodyFile("get-movies-by-name-template-randomized.json")
         )
     );
 
-    final String nameQuery = "Avengers";
+    final String nameQuery = RandomStringUtils.random(32);
     List<Movie> retrievedMovies = moviesRestClient.getMoviesByName(nameQuery);
     assertFalse(retrievedMovies.isEmpty());
     // could have turned them into sets and compared using set logic but this is fine
@@ -198,7 +197,7 @@ public class MoviesRestClientWireMockTest {
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .withBodyFile("get-movie-by-name-template-not-found.json")
+            .withBodyFile("get-movies-by-name-template-not-found.json")
         )
     );
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(randomName), "No Movie Available with the given name - " + randomName);
@@ -215,21 +214,49 @@ public class MoviesRestClientWireMockTest {
 
   @Test
   void getMoviesByYear() {
-    Map<Integer, List<Movie>> moviesGroupedByYear = expectedMovies.values().stream().collect(Collectors.groupingBy(Movie::getYear));
-    moviesGroupedByYear.forEach((year, expectedMovies) -> {
-      List<Movie> retrievedMovies = moviesRestClient.getMoviesByYear(year);
-      assertEquals(expectedMovies.size(), retrievedMovies.size());
-      assertTrue(retrievedMovies.containsAll(expectedMovies));
-      assertTrue(expectedMovies.containsAll(retrievedMovies));
+    final Integer year = MoviesTestRandomUtils.getRandomMovieYear();
+    final LocalDate randomDateInYear = MoviesTestRandomUtils.getRandomLocalDateInYear(year);
+    final String stubUrl = String.format(
+        "/%s?%s=%d",
+        MoviesAppConstants.V1_GET_MOVIE_BY_YEAR,
+        MoviesAppConstants.V1_GET_MOVIE_BY_YEAR_QUERY_PARAM_YEAR,
+        year
+    );
+
+    stubFor(get(urlEqualTo(stubUrl))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.OK.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .withBodyFile("get-movies-by-year-template.json")
+            .withTransformerParameter("release_date", randomDateInYear.toString())
+        )
+    );
+
+    List<Movie> retrievedMovies = moviesRestClient.getMoviesByYear(year);
+    retrievedMovies.forEach(it -> {
+      assertIsValidMovie(it);
+      assertEquals(year, it.getYear());
+      assertEquals(randomDateInYear, it.getReleaseDate());
     });
   }
 
   @Test
   void getMoviesByYearNotFound() {
-    IntStream
-        .generate(MoviesTestRandomUtils::getRandomInvalidYear)
-        .limit(25)
-        .forEach(invalidYear -> assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(invalidYear)));
+    final Integer year = MoviesTestRandomUtils.getRandomMovieYear();
+    final String stubUrl = String.format(
+        "/%s?%s=%d",
+        MoviesAppConstants.V1_GET_MOVIE_BY_YEAR,
+        MoviesAppConstants.V1_GET_MOVIE_BY_YEAR_QUERY_PARAM_YEAR,
+        year
+    );
+    stubFor(get(urlEqualTo(stubUrl))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.NOT_FOUND.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .withBodyFile("get-movies-by-year-template-not-found.json")
+        )
+    );
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(year), "No Movie Available with the given year - " + year);
   }
 
   @Test
