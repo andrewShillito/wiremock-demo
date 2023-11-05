@@ -24,6 +24,7 @@ public class MoviesTestRandomUtils {
    * @param length the length of the string to return
    * @return a random ascii string
    */
+  @Deprecated(forRemoval = true)
   public static String getRandomString(int length) {
     StringBuilder sb = new StringBuilder();
     IntStream

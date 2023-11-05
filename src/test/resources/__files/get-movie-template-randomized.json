@@ -1,7 +1,7 @@
 {
   "movie_id": "{{request.path.[3]}}",
-  "name": "{{ randomValue length=10 type='ALPHANUMERIC_AND_SYMBOLS'} }}",
+  "name": "{{ randomValue length=10 type='ALPHANUMERIC'} }}",
   "year": "{{ randomInt lower=1888 upper=2023 }}",
-  "cast": "{{ randomValue length=32 type='ALPHANUMERIC_AND_SYMBOLS' }}",
+  "cast": "{{ randomValue length=32 type='ALPHANUMERIC' }}",
   "release_date": "{{now format='yyyy-MM-dd'}}"
 }

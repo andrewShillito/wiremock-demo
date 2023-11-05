@@ -1,0 +1,30 @@
+[
+  {
+    "movie_id": "1",
+    "name": "{{ request.query.movie_name }} {{ randomValue length=8 type='ALPHANUMERIC' }} {{ randomValue length=10 type='ALPHANUMERIC' }}",
+    "year": "{{ now format='yyyy' }}",
+    "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
+    "release_date": "{{ now format='yyyy-MM-dd' }}"
+  },
+  {
+    "movie_id": "2",
+    "name": "The {{ randomValue length=8 type='ALPHANUMERIC' }} {{ request.query.movie_name }} {{ randomValue length=10 type='ALPHANUMERIC' }}",
+    "year": "{{ now format='yyyy' }}",
+    "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
+    "release_date": "{{ now format='yyyy-MM-dd' }}"
+  },
+  {
+    "movie_id": "3",
+    "name": "A {{ randomValue length=8 type='ALPHANUMERIC' }} {{ randomValue length=10 type='ALPHANUMERIC' }} {{ request.query.movie_name }}",
+    "year": "{{ now format='yyyy' }}",
+    "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
+    "release_date": "{{ now format='yyyy-MM-dd' }}"
+  },
+  {
+    "movie_id": "4",
+    "name": "Story of {{ request.query.movie_name }} {{ randomValue length=10 type='ALPHANUMERIC' }}",
+    "year": "{{ now format='yyyy' }}",
+    "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
+    "release_date": "{{ now format='yyyy-MM-dd' }}"
+  }
+]

@@ -154,25 +154,36 @@ public class MoviesRestClientWireMockTest {
 
   @Test
   void getMovieByName() {
-    final String avengers = "Avengers";
-    List<Movie> expectedAvengersMovies = expectedMovies.entrySet().stream()
-        .filter(it -> it.getKey().contains(avengers))
-        .map(Entry::getValue)
-        .toList();
-    List<Movie> avengersMovies = moviesRestClient.getMoviesByName(avengers);
-    assertEquals(expectedAvengersMovies.size(), avengersMovies.size());
-    // could have turned them into sets and compared using set logic but this is fine
-    assertTrue(expectedAvengersMovies.containsAll(avengersMovies));
-    assertTrue(avengersMovies.containsAll(expectedAvengersMovies));
+    final String stubUrl = String.format(
+        "^/%s\\?%s=[\\w\\W\\s]+$",
+        MoviesAppConstants.V1_GET_MOVIE_BY_NAME,
+        MoviesAppConstants.V1_GET_MOVIE_BY_NAME_QUERY_PARAM_MOVIE_NAME
+    );
+    stubFor(get(urlMatching(stubUrl))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.OK.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .withBodyFile("get-movie-by-name-template-randomized.json")
+        )
+    );
 
-    // given
-    expectedMovies.forEach((name, movie) -> {
-      // when
-      List<Movie> retrievedMovies = moviesRestClient.getMoviesByName(name);
-      // then
-      assertFalse(retrievedMovies.isEmpty());
-      assertTrue(retrievedMovies.stream().allMatch((it) -> movie.equals(it) || it.getName().contains(name)));
+    final String nameQueryParam = "Avengers";
+    List<Movie> retrievedMovies = moviesRestClient.getMoviesByName(nameQueryParam);
+    assertFalse(retrievedMovies.isEmpty());
+    // could have turned them into sets and compared using set logic but this is fine
+    retrievedMovies.forEach(it -> {
+      assertIsValidMovie(it);
+      assertTrue(it.getName().contains(nameQueryParam));
     });
+  }
+
+  void assertIsValidMovie(Movie movie) {
+    assertNotNull(movie);
+    assertNotNull(movie.getMovie_id());
+    assertNotNull(movie.getName());
+    assertNotNull(movie.getCast());
+    assertNotNull(movie.getReleaseDate());
+    assertNotNull(movie.getYear());
   }
 
   @Test
