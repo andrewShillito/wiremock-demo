@@ -18,12 +18,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -261,40 +260,40 @@ public class MoviesRestClientWireMockTest {
 
   @Test
   void createMovie() {
-    // note behavior that id value given is ignored by the rest api
-    AtomicReference<Long> previousId = new AtomicReference<>();
-    // with id
-    IntStream.range(0, 10).forEach(it -> {
-      Movie generatedMovie = MoviesTestRandomUtils.getRandomMovie();
-      assertNull(generatedMovie.getMovie_id());
-      generatedMovie.setMovie_id(random.nextLong(1L, Long.MAX_VALUE));
-      Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
-      Long expectedId = previousId.accumulateAndGet(1L, (a, b) -> a == null || b == null ? createdMovie.getMovie_id() : a + b);
-      assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, expectedId);
-    });
+    final Movie movie = MoviesTestRandomUtils.getRandomMovie();
+    final String stubUrl = String.format("/%s", MoviesAppConstants.V1_POST_MOVIE);
+    stubFor(post(urlEqualTo(stubUrl))
+        .withRequestBody(matchingJsonPath("$.name", equalTo(movie.getName())))
+        .withRequestBody(matchingJsonPath("$.cast", equalTo(movie.getCast())))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.OK.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .withBodyFile("post-movie-template.json")
+        )
+    );
 
-    // without id
-    IntStream.range(0, 10).forEach(it -> {
-      Movie generatedMovie = MoviesTestRandomUtils.getRandomMovie();
-      assertNull(generatedMovie.getMovie_id());
-      Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
-      assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, previousId.accumulateAndGet(1L, Long::sum));
-    });
+    Movie createdMovie = moviesRestClient.createMovie(movie);
+    assertCreatedMovieIsAsExpected(movie, createdMovie);
   }
 
-  void assertCreatedMovieIsAsExpected(Movie expected, Movie actual, Long expectedId) {
+  void assertCreatedMovieIsAsExpected(Movie expected, Movie actual) {
     assertEquals(expected.getName(), actual.getName());
     assertEquals(expected.getCast(), actual.getCast());
-    assertEquals(expected.getReleaseDate(), actual.getReleaseDate());
     assertEquals(expected.getYear(), actual.getYear());
     assertNotEquals(expected.getMovie_id(), actual.getMovie_id());
-    if (expectedId != null) {
-      assertEquals(expectedId, actual.getMovie_id());
-    }
   }
 
   @Test
   void createMovieBadRequest() {
+    final String stubUrl = String.format("/%s", MoviesAppConstants.V1_POST_MOVIE);
+    stubFor(post(urlPathMatching(stubUrl))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.BAD_REQUEST.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+            .withBodyFile("post-movie-template-not-found.json")
+        )
+    );
+
     badCreateRequest(m -> m.setCast(null));
     badCreateRequest(m -> m.setName(null));
     badCreateRequest(m -> m.setYear(null));
@@ -309,93 +308,125 @@ public class MoviesRestClientWireMockTest {
 
   @Test
   void updateMovie() {
-    Movie generatedMovie = MoviesTestRandomUtils.getRandomMovie();
-    Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
-    assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, null);
-
-    // clear cast?
-    String cast = createdMovie.getCast();
-    createdMovie.setCast(null);
-    Movie updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
-    assertEquals(cast, updated.getCast()); // nothing happens if you try to set to null
+    final Movie movie = MoviesTestRandomUtils.getRandomMovie();
+    movie.setMovie_id(RandomUtils.nextLong(1, Long.MAX_VALUE));
+    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
+    stubFor(put(urlMatching(stubUrl))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.OK.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .withBodyFile("put-movie-template.json")
+            .withTransformerParameter("cast", movie.getCast())
+            .withTransformerParameter("id", movie.getMovie_id())
+        )
+    );
 
     // append to cast
-    createdMovie.setCast(RandomStringUtils.randomAscii(10));
-    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
-    assertEquals(cast + ", " + createdMovie.getCast(), updated.getCast());
+    String existingCast = movie.getCast();
+    movie.setCast(RandomStringUtils.randomAlphanumeric(10));
+    Movie updated = moviesRestClient.updateMovie(movie.getMovie_id(), movie);
+    assertEquals(existingCast + ", " + movie.getCast(), updated.getCast());
 
     // change name
-    createdMovie.setName(MoviesTestRandomUtils.getRandomUniqueMovieName(expectedMovies));
-    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
-    assertEquals(createdMovie.getName(), updated.getName());
-
-    // try and fail to increment id
-    Long existingId = createdMovie.getMovie_id();
-    Long newId = createdMovie.getMovie_id() + 1;
-    createdMovie.setMovie_id(newId);
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie), "Not Found");
-    createdMovie.setMovie_id(existingId); // reset to correct value
-
-    // change LocalDate
-    createdMovie.setReleaseDate(MoviesTestRandomUtils.getRandomLocalDate(seededYears));
-    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
-    assertEquals(createdMovie.getReleaseDate(), updated.getReleaseDate());
+    movie.setName(MoviesTestRandomUtils.getRandomUniqueMovieName(expectedMovies));
+    updated = moviesRestClient.updateMovie(movie.getMovie_id(), movie);
+    assertEquals(movie.getName(), updated.getName());
 
     // change year
-    createdMovie.setYear(MoviesTestRandomUtils.getRandomYear(seededYears));
-    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
-    assertEquals(createdMovie.getYear(), updated.getYear());
+    movie.setYear(MoviesTestRandomUtils.getRandomYear(seededYears));
+    updated = moviesRestClient.updateMovie(movie.getMovie_id(), movie);
+    assertEquals(movie.getYear(), updated.getYear());
+  }
 
-    // change everything at once
-    LocalDate newReleaseDate = MoviesTestRandomUtils.getRandomLocalDate(seededYears);
-    String appendToCast = RandomStringUtils.randomAscii(10);
-    String newName = MoviesTestRandomUtils.getRandomName();
-    String previousCast = updated.getCast();
-    createdMovie.setName(newName);
-    createdMovie.setCast(appendToCast);
-    createdMovie.setReleaseDate(newReleaseDate);
-    createdMovie.setYear(newReleaseDate.getYear());
-    updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
-    assertEquals(createdMovie.getMovie_id(), updated.getMovie_id());
-    assertEquals(createdMovie.getName(), updated.getName());
-    assertEquals(previousCast + ", " + createdMovie.getCast(), updated.getCast());
-    assertEquals(createdMovie.getReleaseDate(), updated.getReleaseDate());
-    assertEquals(createdMovie.getYear(), updated.getYear());
+  @Test
+  void updateMovieNotFound() {
+    final Movie movie = MoviesTestRandomUtils.getRandomMovie();
+    movie.setMovie_id(RandomUtils.nextLong(1, Long.MAX_VALUE));
+    final String stubUrlNotFound = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id() + 1);
+    stubFor(put(urlMatching(stubUrlNotFound))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.NOT_FOUND.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .withBodyFile("put-movie-template-not-found.json")
+            .withTransformerParameter("cast", movie.getCast())
+            .withTransformerParameter("id", movie.getMovie_id() + 1)
+        )
+    );
+    Long existingId = movie.getMovie_id();
+    Long newId = movie.getMovie_id() + 1;
+    movie.setMovie_id(newId);
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.updateMovie(movie.getMovie_id(), movie), "Not Found");
+    movie.setMovie_id(existingId); // reset to correct value
+  }
+
+  @Test
+  void updateMovieBadRequest() {
+    final Movie movie = MoviesTestRandomUtils.getRandomMovie();
+    movie.setMovie_id(RandomUtils.nextLong(1, Long.MAX_VALUE));
+    final String stubUrlNotFound = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
+    stubFor(put(urlMatching(stubUrlNotFound))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.BAD_REQUEST.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .withBodyFile("put-movie-template-bad-request.json")
+            .withTransformerParameter("cast", movie.getCast())
+            .withTransformerParameter("id", movie.getMovie_id())
+        )
+    );
+    movie.setName(null);
+    movie.setYear(null);
+    movie.setReleaseDate(null);
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.updateMovie(movie.getMovie_id(), movie), "Not Found");
   }
 
   @Test
   void deleteMovie() {
+    final Movie movie = MoviesTestRandomUtils.getRandomMovie();
+    movie.setMovie_id(RandomUtils.nextLong(0, Long.MAX_VALUE));
+    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
+    stubFor(delete(urlEqualTo(stubUrl))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.OK.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+            .withBodyFile("delete-movie-template.json")
+        )
+    );
+
     final String expectedResponseBody = "Movie Deleted Successfully";
 
-    Movie generatedMovie = MoviesTestRandomUtils.getRandomMovie();
-    Movie createdMovie = moviesRestClient.createMovie(generatedMovie);
-    assertCreatedMovieIsAsExpected(generatedMovie, createdMovie, null);
-
-    Movie generatedMovie2 = MoviesTestRandomUtils.getRandomMovie();
-    Movie createdMovie2 = moviesRestClient.createMovie(generatedMovie2);
-    assertCreatedMovieIsAsExpected(generatedMovie2, createdMovie2, null);
-
     // delete existing movie
-    String deleteResponse = moviesRestClient.deleteMovie(createdMovie.getMovie_id());
+    String deleteResponse = moviesRestClient.deleteMovie(movie.getMovie_id());
     assertEquals(expectedResponseBody, deleteResponse);
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(createdMovie.getMovie_id()));
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(createdMovie.getMovie_id()));
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(createdMovie.getName()));
-    assertEquals(createdMovie2, moviesRestClient.getMovieById(createdMovie2.getMovie_id()));
+  }
 
-    // delete second existing movie
-    deleteResponse = moviesRestClient.deleteMovie(createdMovie2.getMovie_id());
-    assertEquals(expectedResponseBody, deleteResponse);
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(createdMovie2.getMovie_id()));
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(createdMovie2.getMovie_id()));
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(createdMovie2.getName()));
+  @Test
+  void deleteMovieBadRequest() {
+    final Movie movie = MoviesTestRandomUtils.getRandomMovie();
+    movie.setMovie_id(RandomUtils.nextLong(0, Long.MAX_VALUE));
+    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
+    stubFor(delete(urlEqualTo(stubUrl))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.BAD_REQUEST.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+            .withBodyFile("delete-movie-template-bad-request.json")
+        )
+    );
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(movie.getMovie_id()));
+  }
 
-    // invalid arguments
-    assertThrows(NullPointerException.class, () -> moviesRestClient.deleteMovie(null));
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(0L));
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(-1L));
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(Long.MIN_VALUE));
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(Long.MAX_VALUE));
+  @Test
+  void deleteMovieNotFound() {
+    final Movie movie = MoviesTestRandomUtils.getRandomMovie();
+    movie.setMovie_id(RandomUtils.nextLong(0, Long.MAX_VALUE));
+    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
+    stubFor(delete(urlEqualTo(stubUrl))
+        .willReturn(aResponse()
+            .withStatus(HttpStatus.NOT_FOUND.value())
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+            .withBodyFile("delete-movie-template-not-found.json")
+        )
+    );
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(movie.getMovie_id()));
   }
 
 }

@@ -52,7 +52,7 @@ public class MoviesTestRandomUtils {
   }
 
   public static String getRandomName() {
-    return RandomStringUtils.randomAscii(24, 64);
+    return RandomStringUtils.randomAlphanumeric(24, 64);
   }
 
   /**
@@ -60,9 +60,9 @@ public class MoviesTestRandomUtils {
    * @return a randomly generated movie
    */
   public static Movie getRandomMovie() {
-    LocalDate localDate = getRandomLocalDate();
+    LocalDate localDate = getRandomLocalDateInYear(getRandomMovieYear());
     return new Movie(
-        RandomStringUtils.randomAscii(100),
+        RandomStringUtils.randomAlphanumeric(100),
         getRandomName(),
         localDate,
         localDate.getYear()

@@ -1,34 +1,34 @@
 [
   {
-    "movie_id": "1",
+    "movie_id": "{{ randomValue length=1 type='NUMERIC' }}",
     "name": "{{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }} {{ randomValue length=6 type='ALPHANUMERIC' }}",
     "year": "{{ request.query.year }}",
     "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
     "release_date": "{{ parameters.release_date }}"
   },
   {
-    "movie_id": "2",
+    "movie_id": "{{ randomValue length=2 type='NUMERIC' }}",
     "name": "The {{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }} {{ randomValue length=6 type='ALPHANUMERIC' }}",
     "year": "{{ request.query.year }}",
     "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
     "release_date": "{{ parameters.release_date }}"
   },
   {
-    "movie_id": "3",
+    "movie_id": "{{ randomValue length=3 type='NUMERIC' }}",
     "name": "A {{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }} {{ randomValue length=6 type='ALPHANUMERIC' }}",
     "year": "{{ request.query.year }}",
     "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
     "release_date": "{{ parameters.release_date }}"
   },
   {
-    "movie_id": "4",
+    "movie_id": "{{ randomValue length=4 type='NUMERIC' }}",
     "name": "Story of {{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }}",
     "year": "{{ request.query.year }}",
     "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
     "release_date": "{{ parameters.release_date }}"
   },
   {
-    "movie_id": "5",
+    "movie_id": "{{ randomValue length=5 type='NUMERIC' }}",
     "name": "A tale of {{ randomValue length=5 type='ALPHABETIC' }} {{ randomValue length=3 type='ALPHANUMERIC' }}",
     "year": "{{ request.query.year }}",
     "cast": "{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }},{{ randomValue length=8 type='ALPHANUMERIC' }}",
