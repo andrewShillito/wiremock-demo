@@ -222,7 +222,7 @@ public class MoviesRestClientTest {
     assertEquals(cast, updated.getCast()); // nothing happens if you try to set to null
 
     // append to cast
-    createdMovie.setCast(RandomStringUtils.randomAscii(10));
+    createdMovie.setCast(RandomStringUtils.randomAlphabetic(10));
     updated = moviesRestClient.updateMovie(createdMovie.getMovie_id(), createdMovie);
     assertEquals(cast + ", " + createdMovie.getCast(), updated.getCast());
 
@@ -250,7 +250,7 @@ public class MoviesRestClientTest {
 
     // change everything at once
     LocalDate newReleaseDate = MoviesTestRandomUtils.getRandomLocalDate(seededYears);
-    String appendToCast = RandomStringUtils.randomAscii(10);
+    String appendToCast = RandomStringUtils.randomAlphabetic(10);
     String newName = MoviesTestRandomUtils.getRandomName();
     String previousCast = updated.getCast();
     createdMovie.setName(newName);

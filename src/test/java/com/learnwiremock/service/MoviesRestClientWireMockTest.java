@@ -77,7 +77,8 @@ public class MoviesRestClientWireMockTest {
 
   @Test
   void retrieveAllMovies() {
-    stubFor(get("/" + MoviesAppConstants.V1_GET_ALL_MOVIES)
+    final String stubUrl = "/" + MoviesAppConstants.V1_GET_ALL_MOVIES;
+    stubFor(get(stubUrl)
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -91,6 +92,7 @@ public class MoviesRestClientWireMockTest {
     assertFalse(movies.isEmpty());
     assertTrue(movies.stream().allMatch(expectedMovies::containsValue));
     assertTrue(movies.containsAll(expectedMovies.values()));
+    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
   }
 
   @Test
@@ -98,7 +100,8 @@ public class MoviesRestClientWireMockTest {
     final String exampleName = "Example name";
     final String exampleCast = "Example cast member, member number 2, another third member";
     final LocalDate exampleDate = MoviesTestRandomUtils.getRandomLocalDate();
-    stubFor(get(urlPathMatching("/movieservice/v1/movie/\\d+"))
+    final String stubUrl = "/movieservice/v1/movie/\\d+";
+    stubFor(get(urlPathMatching(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -110,7 +113,8 @@ public class MoviesRestClientWireMockTest {
         )
     );
 
-    LongStream.range(0, 10).forEach((it) -> {
+    final int requestCount = 10;
+    LongStream.range(0, requestCount).forEach((it) -> {
       Movie templateResult = moviesRestClient.getMovieById(it);
       assertNotNull(templateResult);
       assertEquals(it, templateResult.getMovie_id());
@@ -119,11 +123,13 @@ public class MoviesRestClientWireMockTest {
       assertEquals(exampleDate, templateResult.getReleaseDate());
       assertEquals(exampleDate.getYear(), templateResult.getYear());
     });
+    verify(exactly(requestCount), getRequestedFor(urlPathMatching(stubUrl)));
   }
 
   @Test
   void getMovieByIdNotFound() {
-    stubFor(get(urlPathMatching("/movieservice/v1/movie/-?\\d+"))
+    final String stubUrl = "/movieservice/v1/movie/-?\\d+";
+    stubFor(get(urlPathMatching(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -147,6 +153,7 @@ public class MoviesRestClientWireMockTest {
         .generate(() -> random.nextLong(Long.MIN_VALUE, 0))
         .limit(5)
         .forEach(invalidId -> assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(invalidId)));
+    verify(exactly(11), getRequestedFor(urlPathMatching(stubUrl)));
   }
 
   @Test
@@ -164,7 +171,7 @@ public class MoviesRestClientWireMockTest {
         )
     );
 
-    final String nameQuery = RandomStringUtils.random(32);
+    final String nameQuery = RandomStringUtils.randomAlphabetic(32);
     List<Movie> retrievedMovies = moviesRestClient.getMoviesByName(nameQuery);
     assertFalse(retrievedMovies.isEmpty());
     // could have turned them into sets and compared using set logic but this is fine
@@ -172,6 +179,7 @@ public class MoviesRestClientWireMockTest {
       assertIsValidMovie(it);
       assertTrue(it.getName().contains(nameQuery));
     });
+    verify(exactly(1), getRequestedFor(urlMatching(stubUrl)));
   }
 
   void assertIsValidMovie(Movie movie) {
@@ -200,12 +208,11 @@ public class MoviesRestClientWireMockTest {
         )
     );
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(randomName), "No Movie Available with the given name - " + randomName);
+    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
   }
 
   @Test
   void getMoviesByNameInvalidNameArgument() {
-    // Note that this is different than the class impl
-    // Overall, null, empty string, and blank string name arguments seemed like improper usage of this method
     assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName(""), "Name argument in get movies by name must not be blank");
     assertThrows(IllegalArgumentException.class, () -> moviesRestClient.getMoviesByName("   "), "Name argument in get movies by name must not be blank");
     assertThrows(NullPointerException.class, () -> moviesRestClient.getMoviesByName(null));
@@ -237,6 +244,7 @@ public class MoviesRestClientWireMockTest {
       assertEquals(year, it.getYear());
       assertEquals(randomDateInYear, it.getReleaseDate());
     });
+    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
   }
 
   @Test
@@ -256,6 +264,7 @@ public class MoviesRestClientWireMockTest {
         )
     );
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(year), "No Movie Available with the given year - " + year);
+    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
   }
 
   @Test
@@ -274,6 +283,7 @@ public class MoviesRestClientWireMockTest {
 
     Movie createdMovie = moviesRestClient.createMovie(movie);
     assertCreatedMovieIsAsExpected(movie, createdMovie);
+    verify(exactly(1), postRequestedFor(urlEqualTo(stubUrl)));
   }
 
   void assertCreatedMovieIsAsExpected(Movie expected, Movie actual) {
@@ -286,7 +296,7 @@ public class MoviesRestClientWireMockTest {
   @Test
   void createMovieBadRequest() {
     final String stubUrl = String.format("/%s", MoviesAppConstants.V1_POST_MOVIE);
-    stubFor(post(urlPathMatching(stubUrl))
+    stubFor(post(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.BAD_REQUEST.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
@@ -298,6 +308,7 @@ public class MoviesRestClientWireMockTest {
     badCreateRequest(m -> m.setName(null));
     badCreateRequest(m -> m.setYear(null));
     badCreateRequest(m -> m.setReleaseDate(null));
+    verify(exactly(4), postRequestedFor(urlEqualTo(stubUrl)));
   }
 
   void badCreateRequest(Consumer<Movie> mutator) {
@@ -311,7 +322,7 @@ public class MoviesRestClientWireMockTest {
     final Movie movie = MoviesTestRandomUtils.getRandomMovie();
     movie.setMovie_id(RandomUtils.nextLong(1, Long.MAX_VALUE));
     final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
-    stubFor(put(urlMatching(stubUrl))
+    stubFor(put(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -335,6 +346,7 @@ public class MoviesRestClientWireMockTest {
     movie.setYear(MoviesTestRandomUtils.getRandomYear(seededYears));
     updated = moviesRestClient.updateMovie(movie.getMovie_id(), movie);
     assertEquals(movie.getYear(), updated.getYear());
+    verify(exactly(3), putRequestedFor(urlEqualTo(stubUrl)));
   }
 
   @Test
@@ -342,7 +354,7 @@ public class MoviesRestClientWireMockTest {
     final Movie movie = MoviesTestRandomUtils.getRandomMovie();
     movie.setMovie_id(RandomUtils.nextLong(1, Long.MAX_VALUE));
     final String stubUrlNotFound = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
-    stubFor(put(urlMatching(stubUrlNotFound))
+    stubFor(put(urlEqualTo(stubUrlNotFound))
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -350,14 +362,15 @@ public class MoviesRestClientWireMockTest {
         )
     );
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.updateMovie(movie.getMovie_id(), movie), "Not Found");
+    verify(exactly(1), putRequestedFor(urlEqualTo(stubUrlNotFound)));
   }
 
   @Test
   void updateMovieBadRequest() {
     final Movie movie = MoviesTestRandomUtils.getRandomMovie();
     movie.setMovie_id(RandomUtils.nextLong(1, Long.MAX_VALUE));
-    final String stubUrlNotFound = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
-    stubFor(put(urlMatching(stubUrlNotFound))
+    final String stubUrlBadRequest = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
+    stubFor(put(urlEqualTo(stubUrlBadRequest))
         .willReturn(aResponse()
             .withStatus(HttpStatus.BAD_REQUEST.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -370,6 +383,7 @@ public class MoviesRestClientWireMockTest {
     movie.setYear(null);
     movie.setReleaseDate(null);
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.updateMovie(movie.getMovie_id(), movie), "Not Found");
+    verify(exactly(1), putRequestedFor(urlEqualTo(stubUrlBadRequest)));
   }
 
   @Test
@@ -390,13 +404,13 @@ public class MoviesRestClientWireMockTest {
     // delete existing movie
     String deleteResponse = moviesRestClient.deleteMovie(movie.getMovie_id());
     assertEquals(expectedResponseBody, deleteResponse);
+    verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
   }
 
   @Test
   void deleteMovieBadRequest() {
-    final Movie movie = MoviesTestRandomUtils.getRandomMovie();
-    movie.setMovie_id(RandomUtils.nextLong(0, Long.MAX_VALUE));
-    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
+    final Long badRequestId = RandomUtils.nextLong(0, Long.MAX_VALUE);
+    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", badRequestId);
     stubFor(delete(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.BAD_REQUEST.value())
@@ -404,14 +418,14 @@ public class MoviesRestClientWireMockTest {
             .withBodyFile("delete-movie-template-bad-request.json")
         )
     );
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(movie.getMovie_id()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(badRequestId));
+    verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
   }
 
   @Test
   void deleteMovieNotFound() {
-    final Movie movie = MoviesTestRandomUtils.getRandomMovie();
-    movie.setMovie_id(RandomUtils.nextLong(0, Long.MAX_VALUE));
-    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
+    final Long notFoundId = RandomUtils.nextLong(0, Long.MAX_VALUE);
+    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", notFoundId);
     stubFor(delete(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
@@ -419,6 +433,7 @@ public class MoviesRestClientWireMockTest {
             .withBodyFile("delete-movie-template-not-found.json")
         )
     );
-    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(movie.getMovie_id()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(notFoundId));
+    verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
   }
 }
