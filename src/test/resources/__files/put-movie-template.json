@@ -1,5 +1,5 @@
 {
-  "movie_id": "{{ parameters.id }}",
+  "movie_id": "{{ request.path.[3] }}",
   "name": "{{ jsonPath request.body '$.name' }}",
   "year": "{{ jsonPath request.body '$.year' }}",
   "cast": "{{ parameters.cast }}, {{ jsonPath request.body '$.cast' }}",

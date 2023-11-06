@@ -317,7 +317,6 @@ public class MoviesRestClientWireMockTest {
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .withBodyFile("put-movie-template.json")
             .withTransformerParameter("cast", movie.getCast())
-            .withTransformerParameter("id", movie.getMovie_id())
         )
     );
 
@@ -342,21 +341,15 @@ public class MoviesRestClientWireMockTest {
   void updateMovieNotFound() {
     final Movie movie = MoviesTestRandomUtils.getRandomMovie();
     movie.setMovie_id(RandomUtils.nextLong(1, Long.MAX_VALUE));
-    final String stubUrlNotFound = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id() + 1);
+    final String stubUrlNotFound = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
     stubFor(put(urlMatching(stubUrlNotFound))
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .withBodyFile("put-movie-template-not-found.json")
-            .withTransformerParameter("cast", movie.getCast())
-            .withTransformerParameter("id", movie.getMovie_id() + 1)
         )
     );
-    Long existingId = movie.getMovie_id();
-    Long newId = movie.getMovie_id() + 1;
-    movie.setMovie_id(newId);
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.updateMovie(movie.getMovie_id(), movie), "Not Found");
-    movie.setMovie_id(existingId); // reset to correct value
   }
 
   @Test
@@ -387,7 +380,7 @@ public class MoviesRestClientWireMockTest {
     stubFor(delete(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
-            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .withBodyFile("delete-movie-template.json")
         )
     );
@@ -407,7 +400,7 @@ public class MoviesRestClientWireMockTest {
     stubFor(delete(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.BAD_REQUEST.value())
-            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .withBodyFile("delete-movie-template-bad-request.json")
         )
     );
@@ -422,11 +415,10 @@ public class MoviesRestClientWireMockTest {
     stubFor(delete(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
-            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .withBodyFile("delete-movie-template-not-found.json")
         )
     );
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(movie.getMovie_id()));
   }
-
 }
