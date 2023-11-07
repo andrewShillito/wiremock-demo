@@ -130,7 +130,7 @@ public class MoviesRestClient {
     }
   }
 
-  public Movie updateMovie(Long id, Movie movie) {
+  public Movie updateMovie(@NonNull Long id, @NonNull Movie movie) {
     try {
       return webClient.put()
           .uri(MoviesAppConstants.V1_PUT_MOVIE_BY_ID, id)

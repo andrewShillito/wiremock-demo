@@ -395,6 +395,7 @@ public class MoviesRestClientWireMockTest {
         )
     );
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(year), "No Movie Available with the given year - " + year);
+    assertThrows(NullPointerException.class, () -> moviesRestClient.getMoviesByYear(null));
     verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
   }
 
@@ -482,6 +483,7 @@ public class MoviesRestClientWireMockTest {
     badCreateRequest(m -> m.setName(null));
     badCreateRequest(m -> m.setYear(null));
     badCreateRequest(m -> m.setReleaseDate(null));
+    assertThrows(NullPointerException.class, () -> moviesRestClient.createMovie(null));
     verify(exactly(4), postRequestedFor(urlEqualTo(postMovieStubUrl)));
   }
 
@@ -592,6 +594,9 @@ public class MoviesRestClientWireMockTest {
     movie.setYear(null);
     movie.setReleaseDate(null);
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.updateMovie(movie.getMovie_id(), movie), "Not Found");
+    assertThrows(NullPointerException.class, () -> moviesRestClient.updateMovie(null, null));
+    assertThrows(NullPointerException.class, () -> moviesRestClient.updateMovie(null, movie));
+    assertThrows(NullPointerException.class, () -> moviesRestClient.updateMovie(movie.getMovie_id(), null));
     verify(exactly(1), putRequestedFor(urlEqualTo(stubUrlBadRequest)));
   }
 
@@ -678,6 +683,7 @@ public class MoviesRestClientWireMockTest {
         )
     );
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(badRequestId));
+    assertThrows(NullPointerException.class, () -> moviesRestClient.deleteMovie(null));
     verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
   }
 
