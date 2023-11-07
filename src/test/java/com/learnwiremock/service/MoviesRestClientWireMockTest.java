@@ -114,6 +114,8 @@ public class MoviesRestClientWireMockTest {
 
   private static final String putMovieStubUrlPrefix = "/movieservice/v1/movie/";
 
+  private static final String deleteMovieStubUrlPrefix = "/movieservice/v1/movie/";
+
   @BeforeEach
   void setUp() {
     final String clientBaseUrl = String.format(wireMockBaseUrl + ":%s/", wireMockServer.port());
@@ -647,7 +649,7 @@ public class MoviesRestClientWireMockTest {
   void deleteMovie() {
     final Movie movie = MoviesTestRandomUtils.getRandomMovie();
     movie.setMovie_id(RandomUtils.nextLong(0, Long.MAX_VALUE));
-    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", movie.getMovie_id());
+    final String stubUrl = deleteMovieStubUrlPrefix + movie.getMovie_id();
     stubFor(delete(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
@@ -667,7 +669,7 @@ public class MoviesRestClientWireMockTest {
   @Test
   void deleteMovieBadRequest() {
     final Long badRequestId = RandomUtils.nextLong(0, Long.MAX_VALUE);
-    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", badRequestId);
+    final String stubUrl = deleteMovieStubUrlPrefix + badRequestId;
     stubFor(delete(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.BAD_REQUEST.value())
@@ -682,7 +684,7 @@ public class MoviesRestClientWireMockTest {
   @Test
   void deleteMovieNotFound() {
     final Long notFoundId = RandomUtils.nextLong(0, Long.MAX_VALUE);
-    final String stubUrl = String.format("/%s%d", "movieservice/v1/movie/", notFoundId);
+    final String stubUrl = deleteMovieStubUrlPrefix + notFoundId;
     stubFor(delete(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
@@ -693,4 +695,50 @@ public class MoviesRestClientWireMockTest {
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(notFoundId));
     verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
   }
+
+  @Test
+  void deleteMovieServerError() {
+    final long id = RandomUtils.nextLong(1, Long.MAX_VALUE);
+    final String stubUrl = deleteMovieStubUrlPrefix + id;
+    stubFor(delete(urlEqualTo(stubUrl)).willReturn(serverError()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(id));
+    verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
+  }
+
+  @Test
+  void deleteMovieServiceUnavailable() {
+    final long id = RandomUtils.nextLong(1, Long.MAX_VALUE);
+    final String stubUrl = deleteMovieStubUrlPrefix + id;
+    stubFor(delete(urlEqualTo(stubUrl)).willReturn(serviceUnavailable()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(id));
+    verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
+  }
+
+  @Test
+  void deleteMovieTimeout() {
+    final long id = RandomUtils.nextLong(1, Long.MAX_VALUE);
+    final String stubUrl = deleteMovieStubUrlPrefix + id;
+    stubFor(delete(urlEqualTo(stubUrl)).willReturn(serviceUnavailable()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(id));
+    verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
+  }
+
+  @Test
+  void deleteMovieFaultEmptyResponse() {
+    final long id = RandomUtils.nextLong(1, Long.MAX_VALUE);
+    final String stubUrl = deleteMovieStubUrlPrefix + id;
+    stubFor(delete(urlEqualTo(stubUrl)).willReturn(aResponse().withFault(Fault.EMPTY_RESPONSE)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(id));
+    verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
+  }
+
+  @Test
+  void deleteMovieFaultMalformedResponse() {
+    final long id = RandomUtils.nextLong(1, Long.MAX_VALUE);
+    final String stubUrl = deleteMovieStubUrlPrefix + id;
+    stubFor(delete(urlEqualTo(stubUrl)).willReturn(aResponse().withFault(Fault.MALFORMED_RESPONSE_CHUNK)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.deleteMovie(id));
+    verify(exactly(1), deleteRequestedFor(urlEqualTo(stubUrl)));
+  }
+
 }
