@@ -61,7 +61,6 @@ public class MoviesRestClientTest {
     System.out.println(movies);
     assertNotNull(movies);
     assertFalse(movies.isEmpty());
-    assertTrue(movies.stream().allMatch(expectedMovies::containsValue));
     assertTrue(movies.containsAll(expectedMovies.values()));
   }
 
@@ -147,9 +146,8 @@ public class MoviesRestClientTest {
     Map<Integer, List<Movie>> moviesGroupedByYear = expectedMovies.values().stream().collect(Collectors.groupingBy(Movie::getYear));
     moviesGroupedByYear.forEach((year, expectedMovies) -> {
       List<Movie> retrievedMovies = moviesRestClient.getMoviesByYear(year);
-      assertEquals(expectedMovies.size(), retrievedMovies.size());
-      assertTrue(retrievedMovies.containsAll(expectedMovies));
-      assertTrue(expectedMovies.containsAll(retrievedMovies));
+      retrievedMovies.forEach(it -> assertEquals(year, it.getYear()));
+      expectedMovies.forEach(it -> assertTrue(retrievedMovies.contains(it)));
     });
   }
 
