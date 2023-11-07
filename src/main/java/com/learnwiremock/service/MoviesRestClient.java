@@ -19,13 +19,23 @@ public class MoviesRestClient {
     this.webClient = webClient;
   }
 
-  List<Movie> getAllMovies() {
-    return webClient.get()
-        .uri(MoviesAppConstants.V1_GET_ALL_MOVIES)
-        .retrieve()
-        .bodyToFlux(Movie.class)
-        .collectList()
-        .block();
+  public List<Movie> getAllMovies() {
+    try {
+      return webClient.get()
+          .uri(MoviesAppConstants.V1_GET_ALL_MOVIES)
+          .retrieve()
+          .bodyToFlux(Movie.class)
+          .collectList()
+          .block();
+    } catch (WebClientResponseException e) {
+      log.error(String.format(e.getClass().getName()
+              + ": Could not retrieve all movies with status %s. Response message is: %s",e.getStatusCode(), e.getResponseBodyAsString()));
+      throw new MovieErrorResponse(e.getStatusText(), e);
+    } catch (Exception e) {
+      log.error(
+          String.format(e.getClass().getName() + ": Could not retrieve all movies. Response message is: %s", e.getMessage()));
+      throw new MovieErrorResponse(e);
+    }
   }
 
   public Movie getMovieById(@NonNull Long id) {

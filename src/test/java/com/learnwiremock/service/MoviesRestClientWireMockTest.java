@@ -8,10 +8,14 @@ import com.github.tomakehurst.wiremock.common.ConsoleNotifier;
 import com.github.tomakehurst.wiremock.core.Options;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
+import com.github.tomakehurst.wiremock.http.Fault;
 import com.learnwiremock.constants.MoviesAppConstants;
 import com.learnwiremock.dto.Movie;
 import com.learnwiremock.exception.MovieErrorResponse;
 import com.learnwiremock.utils.MoviesTestRandomUtils;
+import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import java.time.LocalDate;
 import java.time.Month;
 import java.util.List;
@@ -29,7 +33,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.tcp.TcpClient;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -38,11 +45,22 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
 @ExtendWith(WireMockExtension.class)
 public class MoviesRestClientWireMockTest {
 
+
   MoviesRestClient moviesRestClient;
   WebClient webClient;
 
   @InjectServer
   WireMockServer wireMockServer;
+
+  /*
+  * Note that these timeout settings are fairly low to avoid growing the test time
+  * beyond what is required for asserting timeout handling is as expected
+  */
+
+  /** The number of seconds prior to timeout during read or write once connected */
+  private static final Integer CLIENT_TIMEOUT_SECONDS = 1;
+  /** The number of milliseconds prior to timeout */
+  private static final Integer CLIENT_TIMEOUT_MILLIS = 1000;
 
   @ConfigureWireMock
   Options options = WireMockConfiguration
@@ -50,6 +68,13 @@ public class MoviesRestClientWireMockTest {
       .port(8088)
       .notifier(new ConsoleNotifier(true))
       .extensions(new ResponseTemplateTransformer(true));
+
+  private final TcpClient tcpClient = TcpClient.create()
+      .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CLIENT_TIMEOUT_MILLIS)
+      .doOnConnected(connection -> connection
+          .addHandlerLast(new ReadTimeoutHandler(CLIENT_TIMEOUT_SECONDS))
+          .addHandlerLast(new WriteTimeoutHandler(CLIENT_TIMEOUT_SECONDS))
+      );
 
   private static final Random random = new Random();
   private static final String wireMockBaseUrl = "http://localhost";
@@ -67,18 +92,37 @@ public class MoviesRestClientWireMockTest {
   );
 
   /** Prevent clash of randomly selected years with seeded test movies ( so get movie by year is re-runnable ) */
-  private static Set<Integer> seededYears = Set.of(2005, 2008, 2012, 2015, 2018, 2019, 2009, 2014, 2006);
+  private static final Set<Integer> seededYears = Set.of(2005, 2008, 2012, 2015, 2018, 2019, 2009, 2014, 2006);
+
+  private static final String retrieveAllMoviesStubUrl = "/" + MoviesAppConstants.V1_GET_ALL_MOVIES;
+
+  private static final String getByIdStubUrl = "/movieservice/v1/movie/\\d+";
+
+  private static final String getByNameStubUrl = String.format(
+      "^/%s\\?%s=[\\w\\W\\s]+$",
+      MoviesAppConstants.V1_GET_MOVIE_BY_NAME,
+      MoviesAppConstants.V1_GET_MOVIE_BY_NAME_QUERY_PARAM_MOVIE_NAME
+  );
+
+  private static final String getByYearStubUrl = String.format(
+      "/%s?%s=",
+      MoviesAppConstants.V1_GET_MOVIE_BY_YEAR,
+      MoviesAppConstants.V1_GET_MOVIE_BY_YEAR_QUERY_PARAM_YEAR
+  );
 
   @BeforeEach
   void setUp() {
-    webClient = WebClient.create(String.format(wireMockBaseUrl + ":%s/", wireMockServer.port()));
+    final String clientBaseUrl = String.format(wireMockBaseUrl + ":%s/", wireMockServer.port());
+    webClient = WebClient.builder()
+        .baseUrl(clientBaseUrl)
+        .clientConnector(new ReactorClientHttpConnector(HttpClient.from(tcpClient)))
+        .build();
     moviesRestClient = new MoviesRestClient(webClient);
   }
 
   @Test
   void retrieveAllMovies() {
-    final String stubUrl = "/" + MoviesAppConstants.V1_GET_ALL_MOVIES;
-    stubFor(get(stubUrl)
+    stubFor(get(retrieveAllMoviesStubUrl)
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -92,16 +136,50 @@ public class MoviesRestClientWireMockTest {
     assertFalse(movies.isEmpty());
     assertTrue(movies.stream().allMatch(expectedMovies::containsValue));
     assertTrue(movies.containsAll(expectedMovies.values()));
-    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
+    verify(exactly(1), getRequestedFor(urlEqualTo(retrieveAllMoviesStubUrl)));
+  }
+
+  @Test
+  void retrieveAllMoviesServerError() {
+    stubFor(get(retrieveAllMoviesStubUrl).willReturn(serverError()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getAllMovies());
+    verify(exactly(1), getRequestedFor(urlEqualTo(retrieveAllMoviesStubUrl)));
+  }
+
+  @Test
+  void retrieveAllMoviesServiceUnavailable() {
+    stubFor(get(retrieveAllMoviesStubUrl).willReturn(serviceUnavailable()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getAllMovies());
+    verify(exactly(1), getRequestedFor(urlEqualTo(retrieveAllMoviesStubUrl)));
+  }
+
+  @Test
+  void retrieveAllMoviesTimeout() {
+    stubFor(get(retrieveAllMoviesStubUrl).willReturn(ok().withFixedDelay(CLIENT_TIMEOUT_MILLIS + 1000)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getAllMovies());
+    verify(exactly(1), getRequestedFor(urlEqualTo(retrieveAllMoviesStubUrl)));
+  }
+
+  @Test
+  void retrieveAllMoviesFaultEmptyResponse() {
+    stubFor(get(retrieveAllMoviesStubUrl).willReturn(aResponse().withFault(Fault.EMPTY_RESPONSE)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getAllMovies());
+    verify(exactly(1), getRequestedFor(urlEqualTo(retrieveAllMoviesStubUrl)));
+  }
+
+  @Test
+  void retrieveAllMoviesFaultMalformedResponse() {
+    stubFor(get(retrieveAllMoviesStubUrl).willReturn(aResponse().withFault(Fault.MALFORMED_RESPONSE_CHUNK)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getAllMovies());
+    verify(exactly(1), getRequestedFor(urlEqualTo(retrieveAllMoviesStubUrl)));
   }
 
   @Test
   void getMovieById() {
     final String exampleName = "Example name";
     final String exampleCast = "Example cast member, member number 2, another third member";
-    final LocalDate exampleDate = MoviesTestRandomUtils.getRandomLocalDate();
-    final String stubUrl = "/movieservice/v1/movie/\\d+";
-    stubFor(get(urlPathMatching(stubUrl))
+    final LocalDate exampleDate = MoviesTestRandomUtils.getRandomLocalDateInYear(MoviesTestRandomUtils.getRandomMovieYear());
+    stubFor(get(urlPathMatching(getByIdStubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -123,13 +201,12 @@ public class MoviesRestClientWireMockTest {
       assertEquals(exampleDate, templateResult.getReleaseDate());
       assertEquals(exampleDate.getYear(), templateResult.getYear());
     });
-    verify(exactly(requestCount), getRequestedFor(urlPathMatching(stubUrl)));
+    verify(exactly(requestCount), getRequestedFor(urlPathMatching(getByIdStubUrl)));
   }
 
   @Test
   void getMovieByIdNotFound() {
-    final String stubUrl = "/movieservice/v1/movie/-?\\d+";
-    stubFor(get(urlPathMatching(stubUrl))
+    stubFor(get(urlPathMatching(getByIdStubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -148,22 +225,46 @@ public class MoviesRestClientWireMockTest {
         .generate(() -> random.nextLong(1L, Long.MAX_VALUE))
         .limit(5)
         .forEach(invalidId -> assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(invalidId)));
-    // negative values
-    LongStream
-        .generate(() -> random.nextLong(Long.MIN_VALUE, 0))
-        .limit(5)
-        .forEach(invalidId -> assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(invalidId)));
-    verify(exactly(11), getRequestedFor(urlPathMatching(stubUrl)));
+  }
+
+  @Test
+  void getMovieByIdServerError() {
+    stubFor(get(urlMatching(getByIdStubUrl)).willReturn(serverError()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(1L));
+    verify(exactly(1), getRequestedFor(urlMatching(getByIdStubUrl)));
+  }
+
+  @Test
+  void getMovieByIdServiceUnavailable() {
+    stubFor(get(urlMatching(getByIdStubUrl)).willReturn(serviceUnavailable()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(1L));
+    verify(exactly(1), getRequestedFor(urlMatching(getByIdStubUrl)));
+  }
+
+  @Test
+  void getMovieByIdTimeout() {
+    stubFor(get(urlMatching(getByIdStubUrl)).willReturn(ok().withFixedDelay(CLIENT_TIMEOUT_MILLIS + 1000)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(1L));
+    verify(exactly(1), getRequestedFor(urlMatching(getByIdStubUrl)));
+  }
+
+  @Test
+  void getMovieByIdFaultEmptyResponse() {
+    stubFor(get(urlMatching(getByIdStubUrl)).willReturn(aResponse().withFault(Fault.EMPTY_RESPONSE)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(1L));
+    verify(exactly(1), getRequestedFor(urlMatching(getByIdStubUrl)));
+  }
+
+  @Test
+  void getMovieByIdFaultMalformedResponse() {
+    stubFor(get(urlMatching(getByIdStubUrl)).willReturn(aResponse().withFault(Fault.MALFORMED_RESPONSE_CHUNK)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMovieById(1L));
+    verify(exactly(1), getRequestedFor(urlMatching(getByIdStubUrl)));
   }
 
   @Test
   void getMovieByName() {
-    final String stubUrl = String.format(
-        "^/%s\\?%s=[\\w\\W\\s]+$",
-        MoviesAppConstants.V1_GET_MOVIE_BY_NAME,
-        MoviesAppConstants.V1_GET_MOVIE_BY_NAME_QUERY_PARAM_MOVIE_NAME
-    );
-    stubFor(get(urlMatching(stubUrl))
+    stubFor(get(urlMatching(getByNameStubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -179,7 +280,7 @@ public class MoviesRestClientWireMockTest {
       assertIsValidMovie(it);
       assertTrue(it.getName().contains(nameQuery));
     });
-    verify(exactly(1), getRequestedFor(urlMatching(stubUrl)));
+    verify(exactly(1), getRequestedFor(urlMatching(getByNameStubUrl)));
   }
 
   void assertIsValidMovie(Movie movie) {
@@ -219,16 +320,45 @@ public class MoviesRestClientWireMockTest {
   }
 
   @Test
+  void getMoviesByNameServerError() {
+    stubFor(get(urlMatching(getByNameStubUrl)).willReturn(serverError()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(RandomStringUtils.randomAlphabetic(10)));
+    verify(exactly(1), getRequestedFor(urlMatching(getByNameStubUrl)));
+  }
+
+  @Test
+  void getMoviesByNameServiceUnavailable() {
+    stubFor(get(urlMatching(getByNameStubUrl)).willReturn(serviceUnavailable()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(RandomStringUtils.randomAlphabetic(10)));
+    verify(exactly(1), getRequestedFor(urlMatching(getByNameStubUrl)));
+  }
+
+  @Test
+  void getMoviesByNameTimeout() {
+    stubFor(get(urlMatching(getByNameStubUrl)).willReturn(ok().withFixedDelay(CLIENT_TIMEOUT_MILLIS + 1000)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(RandomStringUtils.randomAlphabetic(10)));
+    verify(exactly(1), getRequestedFor(urlMatching(getByNameStubUrl)));
+  }
+
+  @Test
+  void getMoviesByNameFaultEmptyResponse() {
+    stubFor(get(urlMatching(getByNameStubUrl)).willReturn(aResponse().withFault(Fault.EMPTY_RESPONSE)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(RandomStringUtils.randomAlphabetic(10)));
+    verify(exactly(1), getRequestedFor(urlMatching(getByNameStubUrl)));
+  }
+
+  @Test
+  void getMoviesByNameFaultMalformedResponse() {
+    stubFor(get(urlMatching(getByNameStubUrl)).willReturn(aResponse().withFault(Fault.MALFORMED_RESPONSE_CHUNK)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByName(RandomStringUtils.randomAlphabetic(10)));
+    verify(exactly(1), getRequestedFor(urlMatching(getByNameStubUrl)));
+  }
+
+  @Test
   void getMoviesByYear() {
     final Integer year = MoviesTestRandomUtils.getRandomMovieYear();
     final LocalDate randomDateInYear = MoviesTestRandomUtils.getRandomLocalDateInYear(year);
-    final String stubUrl = String.format(
-        "/%s?%s=%d",
-        MoviesAppConstants.V1_GET_MOVIE_BY_YEAR,
-        MoviesAppConstants.V1_GET_MOVIE_BY_YEAR_QUERY_PARAM_YEAR,
-        year
-    );
-
+    final String stubUrl = getByYearStubUrl + year;
     stubFor(get(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.OK.value())
@@ -250,12 +380,7 @@ public class MoviesRestClientWireMockTest {
   @Test
   void getMoviesByYearNotFound() {
     final Integer year = MoviesTestRandomUtils.getRandomMovieYear();
-    final String stubUrl = String.format(
-        "/%s?%s=%d",
-        MoviesAppConstants.V1_GET_MOVIE_BY_YEAR,
-        MoviesAppConstants.V1_GET_MOVIE_BY_YEAR_QUERY_PARAM_YEAR,
-        year
-    );
+    final String stubUrl = getByYearStubUrl + year;
     stubFor(get(urlEqualTo(stubUrl))
         .willReturn(aResponse()
             .withStatus(HttpStatus.NOT_FOUND.value())
@@ -264,6 +389,51 @@ public class MoviesRestClientWireMockTest {
         )
     );
     assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(year), "No Movie Available with the given year - " + year);
+    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
+  }
+
+  @Test
+  void getMoviesByYearServerError() {
+    final Integer year = MoviesTestRandomUtils.getRandomMovieYear();
+    final String stubUrl = getByYearStubUrl + year;
+    stubFor(get(urlEqualTo(stubUrl)).willReturn(serverError()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(year));
+    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
+  }
+
+  @Test
+  void getMoviesByYearServiceUnavailable() {
+    final Integer year = MoviesTestRandomUtils.getRandomMovieYear();
+    final String stubUrl = getByYearStubUrl + year;
+    stubFor(get(urlEqualTo(stubUrl)).willReturn(serviceUnavailable()));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(year));
+    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
+  }
+
+  @Test
+  void getMoviesByYearTimeout() {
+    final Integer year = MoviesTestRandomUtils.getRandomMovieYear();
+    final String stubUrl = getByYearStubUrl + year;
+    stubFor(get(urlEqualTo(stubUrl)).willReturn(ok().withFixedDelay(CLIENT_TIMEOUT_MILLIS + 1000)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(year));
+    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
+  }
+
+  @Test
+  void getMoviesByYearFaultEmptyResponse() {
+    final Integer year = MoviesTestRandomUtils.getRandomMovieYear();
+    final String stubUrl = getByYearStubUrl + year;
+    stubFor(get(urlEqualTo(stubUrl)).willReturn(aResponse().withFault(Fault.EMPTY_RESPONSE)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(year));
+    verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
+  }
+
+  @Test
+  void getMoviesByYearFaultMalformedResponse() {
+    final Integer year = MoviesTestRandomUtils.getRandomMovieYear();
+    final String stubUrl = getByYearStubUrl + year;
+    stubFor(get(urlEqualTo(stubUrl)).willReturn(aResponse().withFault(Fault.MALFORMED_RESPONSE_CHUNK)));
+    assertThrows(MovieErrorResponse.class, () -> moviesRestClient.getMoviesByYear(year));
     verify(exactly(1), getRequestedFor(urlEqualTo(stubUrl)));
   }
 
